@@ -760,7 +760,7 @@ Sock::bindWithin(condor_protocol proto, const int low_port, const int high_port)
 	return FALSE;
 }
 
-int Sock::bind(condor_protocol proto, bool outbound, int port, bool loopback)
+int Sock::bind(condor_protocol proto, bool outbound, int port, bool loopback, condor_sockaddr *bindTo)
 {
 	if( proto <= CP_INVALID_MIN || proto >= CP_INVALID_MAX ) {
 		EXCEPT( "Unknown protocol (%d) in Sock::bind(); aborting.", proto );
@@ -785,7 +785,7 @@ int Sock::bind(condor_protocol proto, bool outbound, int port, bool loopback)
 		return FALSE;
 	}
 
-	static bool reuse = param_boolean("ALWAYS_REUSEADDR", false);
+	static bool reuse = param_boolean("ALWAYS_REUSEADDR", true);
 	if (reuse) {	
 		int one = 1;
     	this->setsockopt(SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one));
@@ -837,7 +837,12 @@ int Sock::bind(condor_protocol proto, bool outbound, int port, bool loopback)
 			addr.set_protocol(proto);
 		}
 		if( loopback ) {
-			addr.set_loopback();
+			if (bindTo) {
+				addr = *bindTo;
+			} else {
+				addr.set_loopback();
+			}
+
 		} else if( (bool)_condor_bind_all_interfaces() ) {
 			addr.set_addr_any();
 		} else {

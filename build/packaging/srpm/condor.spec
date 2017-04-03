@@ -394,6 +394,7 @@ Requires(postun):/sbin/service
 
 %if 0%{?rhel} >= 7
 Requires(post): policycoreutils-python
+Requires(post): selinux-policy-targeted >= 3.13.1-102
 %endif
 
 #Provides: user(condor) = 43
@@ -1367,8 +1368,9 @@ rm -rf %{buildroot}
 %_bindir/condor_job_router_info
 %_bindir/condor_transform_ads
 %_bindir/condor_update_machine_ad
-# reconfig_schedd, restart
+%_bindir/condor_annex
 # sbin/condor is a link for master_off, off, on, reconfig,
+# reconfig_schedd, restart
 %_sbindir/condor_advertise
 %_sbindir/condor_aklog
 %_sbindir/condor_c-gahp
@@ -1895,6 +1897,40 @@ fi
 %endif
 
 %changelog
+* Thu Mar 02 2017 Tim Theisen <tim@cs.wisc.edu> - 8.7.0-1
+- Performance improvements in collector's ingestion of ClassAds
+- Added collector attributes to report query times and forks
+- Removed extra white space around parentheses when unparsing ClassAds
+- Technology preview of the HTCondor Annex
+
+* Thu Mar 02 2017 Tim Theisen <tim@cs.wisc.edu> - 8.6.1-1
+- condor_q works in situations where user authentication is not configured
+- Updates to work with Docker version 1.13
+- Fix several problems with the Job Router
+- Update scripts to support current versions of Open MPI and MPICH2
+- Fixed a bug that could corrupt the job queue log when the disk is full
+
+* Thu Jan 26 2017 Tim Theisen <tim@cs.wisc.edu> - 8.6.0-1
+- condor_q shows shows only the current user's jobs by default
+- condor_q summarizes related jobs (batches) on a single line by default
+- Users can define their own job batch name at job submission time
+- Immutable/protected job attributes make SUBMIT_REQUIREMENTS more useful
+- The shared port daemon is enabled by default
+- Jobs run in cgroups by default
+- HTCondor can now use IPv6 addresses (Prefers IPv4 when both present)
+- DAGMan: Able to easily define SCRIPT, VARs, etc., for all nodes in a DAG
+- DAGMan: Revamped priority implementation
+- DAGMan: New splice connection feature
+- New slurm grid type in the grid universe for submitting to Slurm
+- Numerous improvements to Docker support
+- Several enhancements in the python bindings
+
+* Mon Jan 23 2017 Tim Theisen <tim@cs.wisc.edu> - 8.4.11-1
+- Fixed a bug which delayed startd access to stard cron job results
+- Fixed a bug in pslot preemption that could delay jobs starting
+- Fixed a bug in job cleanup at job lease expiration if using glexec
+- Fixed a bug in locating ganglia shared libraries on Debian and Ubuntu
+
 * Tue Dec 13 2016 Tim Theisen <tim@cs.wisc.edu> - 8.5.8-1
 - The starter puts all jobs in a cgroup by default
 - Added condor_submit commands that support job retries

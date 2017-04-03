@@ -135,6 +135,17 @@ registerAllAmazonCommands(void)
 			AmazonPutRule::ioCheck, AmazonPutRule::workerFunction );
 	registerAmazonGahpCommand( AMAZON_COMMAND_PUT_TARGETS,
 			AmazonPutTargets::ioCheck, AmazonPutTargets::workerFunction );
+	registerAmazonGahpCommand( AMAZON_COMMAND_BULK_STOP,
+			AmazonBulkStop::ioCheck, AmazonBulkStop::workerFunction );
+	registerAmazonGahpCommand( AMAZON_COMMAND_DELETE_RULE,
+			AmazonDeleteRule::ioCheck, AmazonDeleteRule::workerFunction );
+	registerAmazonGahpCommand( AMAZON_COMMAND_REMOVE_TARGETS,
+			AmazonRemoveTargets::ioCheck, AmazonRemoveTargets::workerFunction );
+	registerAmazonGahpCommand( AMAZON_COMMAND_GET_FUNCTION,
+			AmazonGetFunction::ioCheck, AmazonGetFunction::workerFunction );
+
+	registerAmazonGahpCommand( "S3_UPLOAD",
+			AmazonS3Upload::ioCheck, AmazonS3Upload::workerFunction );
 
 	return true;
 }
@@ -173,18 +184,16 @@ main( int argc, char ** const argv )
 	sigprocmask( SIG_UNBLOCK, &sigSet, NULL );
 #endif
 
-	set_mySubSystem("AMAZON_GAHP", SUBSYSTEM_TYPE_GAHP);
-
 	int min_workers = MIN_NUMBER_WORKERS;
 	int max_workers = -1;
-	const char * dprintfName = "EC2_GAHP";
+	const char * subSystemName = "EC2_GAHP";
 
 	int c = 0;
-	while ( (c = my_getopt(argc, argv, "l:f:d:w:m:" )) != -1 ) {
+	while ( (c = my_getopt(argc, argv, "s:f:d:w:m:" )) != -1 ) {
 		switch(c) {
-			case 'l':
+			case 's':
 				if( my_optarg && *my_optarg ) {
-					dprintfName = my_optarg;
+					subSystemName = my_optarg;
 				}
 				break;
 			case 'f':
@@ -214,8 +223,9 @@ main( int argc, char ** const argv )
 		}
 	}
 
+    set_mySubSystem( subSystemName, SUBSYSTEM_TYPE_GAHP );
     config();
-    dprintf_config( dprintfName );
+    dprintf_config( subSystemName );
     const char * debug_string = getenv( "DebugLevel" );
     if( debug_string && * debug_string ) {
         set_debug_flags( debug_string, 0 );

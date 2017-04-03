@@ -1,4 +1,5 @@
 #! /usr/bin/env perl
+#testreq: personal
 ##**************************************************************
 ##
 ## Copyright (C) 1990-2007, Condor Team, Computer Sciences Department,
@@ -412,7 +413,12 @@ print "$sel3\n$result3\n";
 
 RegisterResult(($result0 && $result1 && $result2 && $result2 && $result3),check_name=>"$option$flag", testname=>$testname);
 
-
+$flag = " \"%6.2f;\"";
+$sel0 = "Rank";
+@content = `condor_status -ads $new_ads -format$flag $sel0 -sort Name`;
+#print @content,"\n";
+$result0 = check_type(\%Attr_new, $flag, \@content, $sel0);
+RegisterResult($result0, check_name => "$option$flag", testname => $testname);
 
 CondorTest::EndTest();
 exit(0);

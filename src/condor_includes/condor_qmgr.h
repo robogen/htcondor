@@ -52,6 +52,7 @@ const SetAttributeFlags_t SETDIRTY = (1<<2);
 const SetAttributeFlags_t SHOULDLOG = (1<<3);
 const SetAttributeFlags_t SetAttribute_OnlyMyJobs = (1<<4);
 const SetAttributeFlags_t SetAttribute_QueryOnly = (1<<5); // check if change is allowed, but don't actually change.
+const SetAttributeFlags_t SetAttribute_LateMaterialization = (1<<6); // check if change is allowed, but don't actually change.
 
 #define SHADOW_QMGMT_TIMEOUT 300
 
@@ -227,8 +228,10 @@ int RemoteCommitTransaction(SetAttributeFlags_t flags=0, CondorError *errstack=N
 /** The difference between this and RemoteCommitTransaction is that
 	this function never returns if there is a failure.  This function
 	should only be called from the schedd.
+    Exception: This function can return failure if a SUBMIT_REQUIREMEMT
+      expression evaluates to False.
 */
-void CommitTransaction(SetAttributeFlags_t flags=0);
+int CommitTransaction(SetAttributeFlags_t flags=0, CondorError *errstack=NULL);
 
 int AbortTransaction();
 void AbortTransactionAndRecomputeClusters();

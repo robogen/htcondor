@@ -3,6 +3,7 @@
 
 // #include "condor_common.h"
 // #include "condor_daemon_core.h"
+// #include "classad_collection.h"
 //
 // #include <queue>
 //
@@ -17,7 +18,7 @@
 //     description, fs );
 //
 // A FunctorSequence calls a sequence of functors on a timer, returning
-// to DaemonCore between calls.  Each functor is called (on the timer
+// to DaemonCore between calls.  Each functor is called (on each timer
 // firing) until it stops returning KEEP_STREAM.  If the functor return
 // PASS_STREAM, the next functor in the sequence will be called the next
 // time the timer fires.  After the last functor in the sequence returns
@@ -26,20 +27,32 @@
 // tick).  The cleanup functor must delete the stream and cancel the
 // timer if it so desires.
 //
+// Functors are responsible for ensuring that the timer is called at least
+// one more time while exiting, except for the special cleanup functor.
+//
 
 class FunctorSequence : public Service {
 	public:
-		FunctorSequence( const std::deque< Functor * > & s, Functor * l ) :
-			sequence(s), last(l), current(NULL) { }
+		FunctorSequence( const std::vector< Functor * > & s, Functor * l, ClassAdCollection * c, const std::string & cid, ClassAd * sp );
 		virtual ~FunctorSequence() { }
 
 		void operator() ();
 
+		void log();
+
+	protected:
+		void deleteFunctors();
+
 	private:
-		std::queue< Functor * > sequence;
+		std::vector< Functor * > sequence;
 		Functor * last;
 
-		Functor * current;
+		int current;
+		bool rollingBack;
+
+		ClassAdCollection * commandState;
+		std::string commandID;
+		ClassAd * scratchpad;
 };
 
 #endif /* _CONDOR_FUNCTOR_SEQUENCE_H */

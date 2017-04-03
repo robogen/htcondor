@@ -56,8 +56,12 @@
 #define AMAZON_COMMAND_VM_STATUS_ALL_SPOT   "EC2_VM_STATUS_ALL_SPOT"
 
 #define AMAZON_COMMAND_BULK_START           "EC2_BULK_START"
-#define AMAZON_COMMAND_PUT_RULE             "EC2_PUT_RULE"
-#define AMAZON_COMMAND_PUT_TARGETS          "EC2_PUT_TARGETS"
+#define AMAZON_COMMAND_PUT_RULE             "CWE_PUT_RULE"
+#define AMAZON_COMMAND_PUT_TARGETS          "CWE_PUT_TARGETS"
+#define AMAZON_COMMAND_BULK_STOP            "EC2_BULK_STOP"
+#define AMAZON_COMMAND_DELETE_RULE          "CWE_DELETE_RULE"
+#define AMAZON_COMMAND_REMOVE_TARGETS       "CWE_REMOVE_TARGETS"
+#define AMAZON_COMMAND_GET_FUNCTION         "AWS_GET_FUNCTION"
 
 // S3 Commands
 #define AMAZON_COMMAND_S3_ALL_BUCKETS       "AMAZON_S3_ALL_BUCKETS"
@@ -75,13 +79,15 @@
 
 class AmazonRequest {
     public:
-        AmazonRequest( int i, const char * c, int sv = 2 ) :
+        AmazonRequest( int i, const char * c, int sv = 4 ) :
             includeResponseHeader(false), requestID(i), requestCommand(c),
-            signatureVersion(sv) { }
+            signatureVersion(sv), httpVerb( "POST" ) { }
         virtual ~AmazonRequest();
 
         virtual bool SendRequest();
+        virtual bool SendURIRequest();
         virtual bool SendJSONRequest( const std::string & payload );
+        virtual bool SendS3Request( const std::string & payload );
 
     protected:
         typedef std::map< std::string, std::string > AttributeValueMap;
@@ -96,8 +102,9 @@ class AmazonRequest {
         std::string errorCode;
 
         std::string resultString;
+        unsigned long responseCode;
 
-		bool includeResponseHeader;
+        bool includeResponseHeader;
 
 		// For tracing.
 		int requestID;
@@ -116,16 +123,21 @@ class AmazonRequest {
 
 		int signatureVersion;
 
-		// For signature v4, in case we guess wrong (based on the URL).
+		// For signature v4.  Use if the URL is not of the form
+		// '<service>.<region>.provider.tld'.  (Includes S3.)
 		std::string region;
 		std::string service;
 
+		// Some odd services (Lambda) require the use of GET.
+		// Some odd services (S3) requires the use of PUT.
+		std::string httpVerb;
+
 	private:
 		bool sendV2Request();
-		bool sendV4Request();
+		bool sendV4Request( const std::string & payload, bool sendContentSHA = false );
 
-		void canonicalizeQueryString( std::string & canonicalQueryString );
-		bool createV4Signature( const std::string & payload, std::string & authorizationHeader );
+		std::string canonicalizeQueryString();
+		bool createV4Signature( const std::string & payload, std::string & authorizationHeader, bool sendContentSHA = false );
 
 		bool sendPreparedRequest(	const std::string & protocol,
 									const std::string & uri,
@@ -146,6 +158,7 @@ class AmazonVMStart : public AmazonRequest {
 
     protected:
         std::string instanceID;
+        std::vector< std::string > instanceIDs;
 };
 
 class AmazonVMStartSpot : public AmazonVMStart {
@@ -343,6 +356,20 @@ class AmazonBulkStart : public AmazonRequest {
 		std::string bulkRequestID;
 };
 
+class AmazonBulkStop : public AmazonRequest {
+	public:
+		AmazonBulkStop( int i, const char * c ) : AmazonRequest( i, c ), success( true ) { }
+		virtual ~AmazonBulkStop();
+
+        virtual bool SendRequest();
+
+		static bool ioCheck(char **argv, int argc);
+		static bool workerFunction(char **argv, int argc, std::string &result_string);
+
+	protected:
+		bool success;
+};
+
 class AmazonPutRule : public AmazonRequest {
 	public:
 		AmazonPutRule( int i, const char * c ) : AmazonRequest( i, c ) { }
@@ -357,6 +384,17 @@ class AmazonPutRule : public AmazonRequest {
 		std::string ruleARN;
 };
 
+class AmazonDeleteRule : public AmazonRequest {
+	public:
+		AmazonDeleteRule( int i, const char * c ) : AmazonRequest( i, c ) { }
+		virtual ~AmazonDeleteRule();
+
+		virtual bool SendJSONRequest( const std::string & payload );
+
+		static bool ioCheck(char **argv, int argc);
+		static bool workerFunction(char **argv, int argc, std::string &result_string);
+};
+
 class AmazonPutTargets : public AmazonRequest {
 	public:
 		AmazonPutTargets( int i, const char * c ) : AmazonRequest( i, c ) { }
@@ -366,6 +404,45 @@ class AmazonPutTargets : public AmazonRequest {
 
 		static bool ioCheck(char **argv, int argc);
 		static bool workerFunction(char **argv, int argc, std::string &result_string);
+};
+
+class AmazonRemoveTargets : public AmazonRequest {
+	public:
+		AmazonRemoveTargets( int i, const char * c ) : AmazonRequest( i, c ) { }
+		virtual ~AmazonRemoveTargets();
+
+		virtual bool SendJSONRequest( const std::string & payload );
+
+		static bool ioCheck(char **argv, int argc);
+		static bool workerFunction(char **argv, int argc, std::string &result_string);
+};
+
+class AmazonGetFunction : public AmazonRequest {
+	public:
+		AmazonGetFunction( int i, const char * c ) : AmazonRequest( i, c ) { }
+		virtual ~AmazonGetFunction();
+
+		virtual bool SendURIRequest();
+
+		static bool ioCheck(char **argv, int argc);
+		static bool workerFunction(char **argv, int argc, std::string &result_string);
+
+    protected:
+		std::string functionHash;
+};
+
+class AmazonS3Upload : public AmazonRequest {
+	public:
+		AmazonS3Upload( int i, const char * c ) : AmazonRequest( i, c ) { }
+		virtual ~AmazonS3Upload();
+
+		virtual bool SendRequest();
+
+		static bool ioCheck(char **argv, int argc);
+		static bool workerFunction(char **argv, int argc, std::string &result_string);
+
+	protected:
+		std::string path;
 };
 
 #endif

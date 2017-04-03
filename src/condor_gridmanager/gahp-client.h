@@ -284,6 +284,8 @@ class GenericGahpClient : public Service {
 		bool isStarted() { return server->m_gahp_pid != -1 && !server->m_gahp_startup_failed; }
 		bool isInitialized() { return server->is_initialized; }
 
+		StringList *getCommands() { return server->m_commands_supported; }
+
 	    void setErrorString( const std::string & newErrorString );
 		const char * getErrorString();
 
@@ -504,7 +506,13 @@ class GahpClient : public GenericGahpClient {
 		blah_upload_sandbox(const char *sandbox_id, const ClassAd *job_ad);
 
 		int
+		blah_download_proxy(const char *sandbox_id, const ClassAd *job_ad);
+
+		int
 		blah_destroy_sandbox(const char *sandbox_id, const ClassAd *job_ad);
+
+		bool
+		blah_get_sandbox_path(const char *sandbox_id, std::string &sandbox_path);
 
 		int
 		nordugrid_submit(const char *hostname, const char *rsl, char *&job_id);
@@ -689,6 +697,15 @@ class EC2GahpClient : public GahpClient {
 		EC2GahpClient(	const char * id, const char * path, const ArgList * args );
 		~EC2GahpClient();
 
+		int get_function(	const std::string & service_url,
+							const std::string & publickeyfile,
+							const std::string & privatekeyfile,
+
+							const std::string & functionARN,
+
+							std::string & functionHash,
+							std::string & errorCode );
+
 		int put_targets(	const std::string & service_url,
 							const std::string & publickeyfile,
 							const std::string & privatekeyfile,
@@ -700,16 +717,33 @@ class EC2GahpClient : public GahpClient {
 
 							std::string & errorCode );
 
-		int put_rule(	const std::string & service_url,
-						const std::string & publickeyfile,
-						const std::string & privatekeyfile,
+		int remove_targets(	const std::string & service_url,
+							const std::string & publickeyfile,
+							const std::string & privatekeyfile,
 
-						const std::string & ruleName,
-						const std::string & scheduleExpression,
-						const std::string & state,
+							const std::string & ruleName,
+							const std::string & id,
 
-						std::string & ruleARN,
-						std::string & error_code );
+							std::string & errorCode );
+
+		int put_rule(		const std::string & service_url,
+							const std::string & publickeyfile,
+							const std::string & privatekeyfile,
+
+							const std::string & ruleName,
+							const std::string & scheduleExpression,
+							const std::string & state,
+
+							std::string & ruleARN,
+							std::string & error_code );
+
+		int delete_rule(	const std::string & service_url,
+							const std::string & publickeyfile,
+							const std::string & privatekeyfile,
+
+							const std::string & ruleName,
+
+							std::string & error_code );
 
 		struct LaunchConfiguration {
 			YourString ami_id;
@@ -746,6 +780,16 @@ class EC2GahpClient : public GahpClient {
 			void convertToJSON( std::string & s ) const;
 		};
 
+		int s3_upload(	const std::string & service_url,
+						const std::string & publickeyfile,
+						const std::string & privatekeyfile,
+
+						const std::string & bucketName,
+						const std::string & fileName,
+						const std::string & path,
+
+						std::string & error_code );
+
 		int bulk_start(	const std::string & service_url,
 						const std::string & publickeyfile,
 						const std::string & privatekeyfile,
@@ -778,6 +822,15 @@ class EC2GahpClient : public GahpClient {
 						std::string & bulkRequestID,
 						std::string & error_code );
 
+		int bulk_stop(	const std::string & service_url,
+						const std::string & publickeyfile,
+						const std::string & privatekeyfile,
+
+						const std::string & bulkRequestID,
+
+						std::string & error_code );
+
+
 		int ec2_vm_start( const std::string & service_url,
 						  const std::string & publickeyfile,
 						  const std::string & privatekeyfile,
@@ -793,16 +846,23 @@ class EC2GahpClient : public GahpClient {
 						  const std::string & block_device_mapping,
 						  const std::string & iam_profile_arn,
 						  const std::string & iam_profile_name,
+						  unsigned int maxCount,
 						  StringList & groupnames,
 						  StringList & groupids,
 						  StringList & parametersAndValues,
-						  std::string & instance_id,
+						  std::vector< std::string > & instance_ids,
 						  std::string & error_code );
 
 		int ec2_vm_stop( const std::string & service_url,
 						 const std::string & publickeyfile,
 						 const std::string & privatekeyfile,
 						 const std::string & instance_id,
+						 std::string & error_code );
+
+		int ec2_vm_stop( const std::string & service_url,
+						 const std::string & publickeyfile,
+						 const std::string & privatekeyfile,
+						 const std::vector< std::string > & instance_ids,
 						 std::string & error_code );
 
 		int ec2_vm_status_all( const std::string & service_url,

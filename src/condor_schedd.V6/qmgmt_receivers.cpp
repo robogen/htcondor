@@ -45,8 +45,6 @@ extern char *CondorCertDir;
 
 extern int active_cluster_num;
 
-extern int CheckTransaction( SetAttributeFlags_t, CondorError * errorStack );
-
 static bool QmgmtMayAccessAttribute( char const *attr_name ) {
 	return !ClassAdAttributeIsPrivate( attr_name );
 }
@@ -326,10 +324,9 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 		assert( syscall_sock->end_of_message() );;
 
 		if (strcmp (attr_name, ATTR_MYPROXY_PASSWORD) == 0) {
-			errno = 0;
 			dprintf( D_SYSCALLS, "SetAttributeByConstraint (MyProxyPassword) not supported...\n");
 			rval = 0;
-			terrno = errno;
+			terrno = 0;
 		} else {
 
 			errno = 0;
@@ -388,8 +385,8 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 		// We do NOT want to include MyProxy password in the ClassAd (since it's a secret)
 		// I'm not sure if this is the best place to do this, but....
 		if (attr_name && attr_value && strcmp (attr_name, ATTR_MYPROXY_PASSWORD) == 0) {
-			errno = 0;
 			dprintf( D_SYSCALLS, "Got MyProxyPassword, stashing...\n");
+			errno = 0;
 			rval = SetMyProxyPassword (cluster_id, proc_id, attr_value);
 			terrno = errno;
 			dprintf( D_SYSCALLS, "\trval = %d, errno = %d\n", rval, terrno );
@@ -530,20 +527,11 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 		}
 		assert( syscall_sock->end_of_message() );;
 
-		errno = 0;
 		CondorError errstack;
-		rval = CheckTransaction( flags, & errstack );
+		errno = 0;
+		rval = CommitTransaction( flags, & errstack );
 		terrno = errno;
 		dprintf( D_SYSCALLS, "\tflags = %d, rval = %d, errno = %d\n", flags, rval, terrno );
-
-		if( rval >= 0 ) {
-			errno = 0;
-			CommitTransaction( flags );
-				// CommitTransaction() never returns on failure
-			rval = 0;
-			terrno = errno;
-			dprintf( D_SYSCALLS, "\tflags = %d, rval = %d, errno = %d\n", flags, rval, terrno );
-		}
 
 		syscall_sock->encode();
 		assert( syscall_sock->code(rval) );
@@ -590,6 +578,7 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 			rval = GetAttributeFloat( cluster_id, proc_id, attr_name, &value );
 		}
 		else {
+			errno = EACCES;
 			rval = -1;
 		}
 		terrno = errno;
@@ -629,6 +618,7 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 			rval = GetAttributeInt( cluster_id, proc_id, attr_name, &value );
 		}
 		else {
+			errno = EACCES;
 			rval = -1;
 		}
 		terrno = errno;
@@ -673,6 +663,7 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 			rval = GetAttributeStringNew( cluster_id, proc_id, attr_name, &value );
 		}
 		else {
+			errno = EACCES;
 			rval = -1;
 		}
 		terrno = errno;
@@ -714,6 +705,7 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 			rval = GetAttributeExprNew( cluster_id, proc_id, attr_name, &value );
 		}
 		else {
+			errno = EACCES;
 			rval = -1;
 		}
 		terrno = errno;
@@ -1016,6 +1008,7 @@ do_Q_request(ReliSock *syscall_sock,bool &may_fork)
 		terrno = errno;
 		dprintf( D_SYSCALLS, "\trval = %d, errno = %d\n", rval, terrno );
 #if 0
+		// SendSpoolFile() sends the reply before receiving the file.
 		syscall_sock->encode();
 		assert( syscall_sock->code(rval) );
 		if( rval < 0 ) {

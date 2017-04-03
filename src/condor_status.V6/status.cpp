@@ -183,6 +183,7 @@ bool        expert = false;
 bool		wide_display = false; // when true, don't truncate field data
 bool		invalid_fields_empty = false; // when true, print "" instead of "[?]" for missing data
 const char * mode_constraint = NULL; // constraint set by mode
+int			result_limit = 0; // max number of results we want back.
 int			diagnose = 0;
 const char* diagnostics_ads_file = NULL; // filename to write diagnostics query ads to, from -diagnose:<filename>
 char*		direct = NULL;
@@ -218,7 +219,7 @@ void secondPass (int, char *[]);
 // and CondorQ::fetchQueueFromHostAndProcess callbacks.
 // callback should return false to take ownership of the ad
 typedef bool (*FNPROCESS_ADS_CALLBACK)(void* pv, ClassAd * ad);
-static bool read_classad_file(const char *filename, ClassAdFileParseType::ParseType ads_file_format, FNPROCESS_ADS_CALLBACK callback, void* pv, const char * constr);
+static bool read_classad_file(const char *filename, ClassAdFileParseType::ParseType ads_file_format, FNPROCESS_ADS_CALLBACK callback, void* pv, const char * constr, int limit);
 //void prettyPrint(ROD_MAP_BY_KEY &, TrackTotals *);
 ppOption prettyPrintHeadings (bool any_ads);
 void prettyPrintAd(ppOption pps, ClassAd *ad, int output_index, StringList * whitelist, bool fHashOrder);
@@ -708,6 +709,10 @@ main (int argc, char *argv[])
 		query->addANDConstraint(mode_constraint);
 	}
 
+	// set result limit if any is desired.
+	if (result_limit > 0) {
+		query->setResultLimit(result_limit);
+	}
 
 		// if there was a generic type specified
 	if (genericType) {
@@ -952,7 +957,7 @@ main (int argc, char *argv[])
 
 			temp.clear();
 			temp.reserve(4096);
-			PrintPrintMask(temp, *pFnTable, pm, pheadings, pmms, group_by_keys);
+			PrintPrintMask(temp, *pFnTable, pm, pheadings, pmms, group_by_keys, NULL);
 			fprintf(fout, "%s\n", temp.c_str());
 			//exit (1);
 		}
@@ -1081,7 +1086,7 @@ main (int argc, char *argv[])
 		MyString req; // query requirements
 		q = query->getRequirements(req);
 		const char * constraint = req.empty() ? NULL : req.c_str();
-		if (read_classad_file(ads_file, ads_file_format, process_ads_callback, &ai, constraint)) {
+		if (read_classad_file(ads_file, ads_file_format, process_ads_callback, &ai, constraint, result_limit)) {
 			q = Q_OK;
 		}
 	} else if (NULL != addr) {
@@ -1234,12 +1239,14 @@ int set_status_print_mask_from_stream (
 	}
 	ASSERT(pstream);
 
+	//PRAGMA_REMIND("tj: fix to handle summary formatting.")
 	int err = SetAttrListPrintMaskFromStream(
 					*pstream,
 					*getCondorStatusPrintFormats(),
 					pm,
 					pmopt,
 					group_by_keys,
+					NULL,
 					messages);
 	delete pstream; pstream = NULL;
 	if ( ! err) {
@@ -1260,7 +1267,7 @@ int set_status_print_mask_from_stream (
 	return err;
 }
 
-static bool read_classad_file(const char *filename, ClassAdFileParseType::ParseType ads_file_format, FNPROCESS_ADS_CALLBACK callback, void* pv, const char * constr)
+static bool read_classad_file(const char *filename, ClassAdFileParseType::ParseType ads_file_format, FNPROCESS_ADS_CALLBACK callback, void* pv, const char * constr, int limit)
 {
 	bool success = false;
 	if (ads_file_format < ClassAdFileParseType::Parse_long || ads_file_format > ClassAdFileParseType::Parse_auto) {
@@ -1299,12 +1306,15 @@ static bool read_classad_file(const char *filename, ClassAdFileParseType::ParseT
 			if (close_file) { fclose(file); file = NULL; }
 			return false;
 		} else {
+			int index = 0;
+			if (limit <= 0) limit = INT_MAX;
 			success = true;
 			ClassAd * classad;
 			while ((classad = adIter.next(constraint.Expr()))) {
 				if (callback(pv, classad)) {
 					delete classad; // delete unless the callback took ownership.
 				}
+				if (++index >= limit) break;
 			}
 		}
 		file = NULL;
@@ -1326,6 +1336,7 @@ usage ()
 
 	fprintf (stderr,"\n    and [query-opt] is one of\n"
 		"\t-absent\t\t\tPrint information about absent resources\n"
+		"\t-annex <name>\t\tPrint information about the named annex\n"
 		"\t-avail\t\t\tPrint information about available resources\n"
 		"\t-ckptsrvr\t\tDisplay checkpoint server attributes\n"
 		"\t-claimed\t\tPrint information about claimed resources\n"
@@ -1374,6 +1385,7 @@ usage ()
 		"\t-target <file>\t\tUse target classad with -format or -af evaluation\n"
 		"\n    and [display-opts] are one or more of\n"
 		"\t-long[:<form>]\t\tDisplay entire classads in format <form>. See -ads\n"
+		"\t-limit <n>\t\tDisplay no more than <n> classads.\n"
 		"\t-sort <expr>\t\tSort ClassAds by expressions. 'no' disables sorting\n"
 		"\t-natural[:off]\t\tUse natural sort order in default output (default=on)\n"
 		"\t-total\t\t\tDisplay totals only\n"
@@ -1562,6 +1574,16 @@ firstPass (int argc, char *argv[])
 				exit( 1 );
 			}
 		} else
+		if (is_dash_arg_prefix (argv[i], "annex", 5)) {
+			// can add constraints on second pass only
+			i++;
+			if( ! argv[i] ) {
+				fprintf( stderr, "%s: -annex requires the annex name\n",
+						 myName );
+				fprintf( stderr, "Use \"%s -help\" for details\n", myName );
+				exit( 1 );
+			}
+		} else
 		if (is_dash_arg_prefix (argv[i], "direct", 3)) {
 			if( direct ) {
 				free( direct );
@@ -1590,6 +1612,15 @@ firstPass (int argc, char *argv[])
 		if (is_dash_arg_prefix (argv[i], "help", 1)) {
 			usage ();
 			exit (0);
+		} else
+		if (is_dash_arg_prefix(argv[i], "limit", 2)) {
+			if( !argv[i+1] ) {
+				fprintf( stderr, "%s: -limit requires one additional argument\n", myName );
+				fprintf( stderr, "Use \"%s -help\" for details\n", myName );
+				exit( 1 );
+			}
+			++i;
+			result_limit = atoi(argv[i]);
 		} else
 		if (is_dash_arg_colon_prefix (argv[i], "long", &pcolon, 1)) {
 			ClassAdFileParseType::ParseType parse_type = ClassAdFileParseType::Parse_long;
@@ -1856,8 +1887,12 @@ secondPass (int argc, char *argv[])
 			i++;
 			continue;
 		}
+		if (is_dash_arg_prefix(argv[i], "limit", 2)) {
+			++i;
+			continue;
+		}
 		if (is_dash_arg_prefix (argv[i], "format", 1)) {
-			pm.registerFormat (argv[i+1], argv[i+2]);
+			pm.registerFormatF (argv[i+1], argv[i+2], FormatOptionNoTruncate);
 
 			StringList attributes;
 			ClassAd ad;
@@ -2057,10 +2092,16 @@ secondPass (int argc, char *argv[])
 			}
 			delete [] daemonname;
 			daemonname = NULL;
-		} else
-		if (is_dash_arg_prefix (argv[i], "constraint", 3)) {
+		} else if (is_dash_arg_prefix (argv[i], "constraint", 3)) {
 			if (diagnose) { printf ("[%s]\n", argv[i+1]); }
 			query->addANDConstraint (argv[i+1]);
+			i++;
+		} else if (is_dash_arg_prefix (argv[i], "annex", 5)) {
+			++i;
+			std::string constraint;
+			formatstr( constraint, "AnnexName =?= \"%s\"", argv[i] );
+			if (diagnose) { printf ("[%s]\n", constraint.c_str()); }
+			query->addANDConstraint (constraint.c_str());
 			i++;
 		}
 	}

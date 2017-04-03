@@ -1604,9 +1604,17 @@ type=int
 tags=gridmanager,globusjob
 
 [PERIODIC_EXPR_INTERVAL]
-default=300
+default=60
 type=int
-tags=gridmanager,basejob
+
+[MAX_PERIODIC_EXPR_INTERVAL]
+default=1200
+type=int
+
+[PERIODIC_EXPR_TIMESLICE]
+default=0.01
+type=double
+range=0.0,1.0
 
 [ENABLE_GRID_MONITOR]
 default=true
@@ -1731,13 +1739,29 @@ restart=true
 default=
 type=string
 
-[OUT_LOWPORT]
+[LOWPORT]
 default=
-type=string
+type=int
 
 [IN_LOWPORT]
 default=
-type=string
+type=int
+
+[OUT_LOWPORT]
+default=
+type=int
+
+[LOWPORT]
+default=
+type=int
+
+[IN_HIGHPORT]
+default=
+type=int
+
+[OUT_HIGHPORT]
+default=
+type=int
 
 [CRED_MIN_TIME_LEFT]
 default=120
@@ -2254,6 +2278,11 @@ default=false
 type=bool
 tags=uids
 
+[CREDD_POLLING_TIMEOUT]
+default=20
+type=int
+tags=credd
+
 [Q_QUERY_TIMEOUT]
 default=20
 type=int
@@ -2701,6 +2730,11 @@ default=30
 type=int
 tags=negotiator,matchmaker
 
+[NEGOTIATOR_SOCKET_CACHE_SIZE]
+default=500
+range=1,
+type=int
+
 [NEGOTIATOR_MAX_TIME_PER_SUBMITTER]
 default=31536000
 type=int
@@ -2878,7 +2912,7 @@ type=string
 tags=tools,preen
 
 [SYSTEM_VALID_SPOOL_FILES]
-default=job_queue.log, job_queue.log.tmp, history, Accountant.log, Accountantnew.log, local_univ_execute, .quillwritepassword, .pgpass, .schedd_address, .schedd_address.super, .schedd_classad, OfflineLog
+default=annexd_command.state, job_queue.log, job_queue.log.tmp, history, Accountant.log, Accountantnew.log, local_univ_execute, .quillwritepassword, .pgpass, .schedd_address, .schedd_address.super, .schedd_classad, OfflineLog
 type=string
 customization=const
 description=List of files in the SPOOL directory needed by HTCondor
@@ -3012,6 +3046,10 @@ tags=schedd,JobRouter
 default=$(LOCK)/$(JOB_ROUTER_NAME)Lock
 type=string
 tags=JobRouter
+
+[JOB_ROUTER_ROUND_ROBIN_SELECTION]
+default=true
+type=bool
 
 [POLLING_PERIOD]
 default=
@@ -3522,8 +3560,45 @@ default=$(LOG)/AnnexdLog
 type=path
 tags=annex,log
 
+[ANNEXD_COMMAND_STATE]
+default=$(SPOOL)/annexd_command.state
+type=path
+reconfig=true
+customization=seldom
+tags=annex,log
+
 [ANNEXD_NAME]
 default=Annex Daemon@$(FULL_HOSTNAME)
+type=string
+tags=annex
+
+[ANNEX_DEFAULT_LEASE_DURATION]
+default=3000
+type=long
+tags=annex
+
+[ANNEX_DEFAULT_UNCLAIMED_TIMEOUT]
+default=900
+type=long
+tags=annex
+
+[ANNEX_DEFAULT_EC2_URL]
+default = https://ec2.us-east-1.amazonaws.com
+type=string
+tags=annex
+
+[ANNEX_DEFAULT_CWE_URL]
+default = https://events.us-east-1.amazonaws.com
+type=string
+tags=annex
+
+[ANNEX_DEFAULT_LAMBDA_URL]
+default = https://lambda.us-east-1.amazonaws.com
+type=string
+tags=annex
+
+[ANNEX_DEFAULT_S3_URL]
+default = https://s3.amazonaws.com
 type=string
 tags=annex
 
@@ -3720,6 +3795,12 @@ type=string
 default=$(LOCK)/shared_port_ad
 type=string
 
+[ALWAYS_REUSEADDR]
+default=true
+version=8.6.0
+type=bool
+description=Set SO_REUSEADDR on all sockets
+
 [USE_SHARED_PORT]
 default=true
 version=7.5.0
@@ -3732,6 +3813,11 @@ type=bool
 
 [REPLICATION_USE_SHARED_PORT]
 default=$(HAD_USE_SHARED_PORT)
+type=bool
+
+# Fixes gittrac #6156.
+[DAGMAN_USE_SHARED_PORT]
+default=false
 type=bool
 
 [SHARED_PORT_PORT]
@@ -4345,6 +4431,13 @@ type=string
 description=Determines whether cgroup base memory enforcement should happen
 tags=starter
 
+[IGNORE_LEAF_OOM]
+default=true
+version=8.4.11
+type=bool
+description=Determines whether a job ignores an OOM event if it's using less than its limit
+tags=starter
+
 [BATCH_GAHP_CHECK_STATUS_ATTEMPTS]
 default=5
 version=7.9.5
@@ -4720,6 +4813,12 @@ default=/tmp/pandaStatisticsLog
 type=string
 review=tlmiller
 
+[USE_KEYRING_SESSIONS]
+default=false
+type=bool
+customization=expert
+description=Should HTCondor manage AFS tokens in the kernel keyring
+
 [DISCARD_SESSION_KEYRING_ON_STARTUP]
 default=true
 type=bool
@@ -4739,6 +4838,16 @@ tags=starter
 [DOCKER_DROP_ALL_CAPABILITIES]
 default=true
 type=bool
+
+[OPENMPI_INSTALL_PATH]
+default=/usr/lib64/openmpi
+type=string
+description=Location of OpenMPI install
+
+[OPENMPI_EXCLUDE_NETWORK_INTERFACES]
+default=docker0,virbr0
+type=string
+description=Comma-delimited list of network interfaces that OpenMPI should ignore
 
 [SUBMIT_REQUIREMENT_NAMES]
 default=
@@ -4829,7 +4938,7 @@ description=Path to the High-Availability daemon binary
 type=path
 
 [HAD_SOCKET_NAME]
-default=$(LOCALNAME:had)
+default=had
 type=string
 
 [HAD_ARGS]
@@ -4843,7 +4952,7 @@ description=Path to the Replication daemon binary
 type=path
 
 [REPLICATION_SOCKET_NAME]
-default=$(LOCALNAME:replication)
+default=replication
 type=string
 
 [REPLICATION_ARGS]
@@ -4866,6 +4975,10 @@ type=path
 default=$(LIBEXEC)/condor_gangliad
 win32_default=$(LIBEXEC)\condor_gangliad.exe
 description=Path to the Gangila daemon binary
+type=path
+
+[ANNEXD]
+default=$(SBIN)/condor_annexd
 type=path
 
 [STARTER]
@@ -5041,6 +5154,13 @@ default=$(SBIN)/gce_gahp
 [GCE_GAHP_LOG]
 default=/tmp/GceGahpLog.$(USERNAME)
 win32_default=NUL
+
+[ANNEX_GAHP]
+default=$(EC2_GAHP)
+type=path
+
+[ANNEX_GAHP_LOG]
+default=$(LOG)/AnnexGahpLog
 
 [CREDD]
 default=$(SBIN)/condor_credd
@@ -5621,6 +5741,50 @@ default : @end
 	ALLOW_READ_COLLECTOR=$(ALLOW_READ) $(FLOCK_FROM)
 	ALLOW_READ_STARTD=$(ALLOW_READ) $(FLOCK_FROM)
 	use SECURITY : WITH_AUTHENTICATION
+@end
+
+[$FEATURE.AssignAccountingGroup]
+description=Set the job accounting attributes by mapping the job's Owner attribute args:(map_file)
+default : @fin
+	if ! $(1?)
+	  error : use FEATURE : AssignAccountingGroup requires a map_file argument
+	endif
+	use FEATURE : ScheddUsermapFile(AssignAccountingGroup, $(1))
+	JOB_TRANSFORM_NAMES = $(JOB_TRANSFORM_NAMES) AssignAccountingGroup
+	JOB_TRANSFORM_AssignAccountingGroup = [ copy_Owner="AcctGroupUser"; copy_AcctGroup="RequestedAcctGroup"; eval_set_AcctGroup=usermap("AssignAccountingGroup",AcctGroupUser,AcctGroup); eval_set_AccountingGroup=join(".",usermap("AssignAccountingGroup",AcctGroupUser,AcctGroup),AcctGroupUser); ]
+	# make sure that the user can't qedit these attributes once they have been set.
+	IMMUTABLE_JOB_ATTRS = $(IMMUTABLE_JOB_ATTRS) AcctGroup AcctGroupUser AccountingGroup
+	# require that the user mapped into an accounting group
+	SUBMIT_REQUIREMENT_NAMES = $(SUBMIT_REQUIREMENT_NAMES) AssignAccountingGroup
+	SUBMIT_REQUIREMENT_AssignAccountingGroup = AcctGroup isnt undefined && AccountingGroup isnt undefined
+	SUBMIT_REQUIREMENT_AssignAccountingGroup_REASON = strcat("Submit requirement AssignAccountingGroup not met - Could not map '", Owner, "' to an accounting group", RequestedAcctGroup)
+@fin
+
+
+[$FEATURE.SetJobAttrFromUsermap]
+description=Set a job attribute from a usermap of another job attribute args:(dest_attr, src_attr, map_name [, map_file])
+default : @fin
+	if ! $(3?)
+	  error : use FEATURE : SetJobAttrFromUsermap requires at least 3 arguments: dest_attr, src_attr, map_name [,map_file]
+	endif
+	if $(4?)
+	   use FEATURE : ScheddUsermapFile($(3), $(4))
+	endif
+	JOB_TRANSFORM_NAMES = $(JOB_TRANSFORM_NAMES) Set$(1)
+	JOB_TRANSFORM_Set$(1) = [ eval_set_$(1)=usermap("$(3)",$(2),$(1)); ]
+	SUBMIT_REQUIREMENT_NAMES = $(SUBMIT_REQUIREMENT_NAMES) Require$(1)
+	SUBMIT_REQUIREMENT_Require$(1) = $(1) isnt undefined
+	SUBMIT_REQUIREMENT_Require$(1)_REASON = strcat("Submit requirement Require$(1) not met - Could not map '", $(2)?:"undefined", "' to a $(1)")
+@fin
+
+[$FEATURE.ScheddUsermapFile]
+description=Define a usermap mapping file args:(map_name , map_file)
+default : @end
+   if ! $(2?)
+     error : use FEATURE : ScheddUsermapFile requires 2 arguments: map_name, map_file
+   endif
+   SCHEDD_CLASSAD_USER_MAP_NAMES = $(SCHEDD_CLASSAD_USER_MAP_NAMES) $(1)
+   CLASSAD_USER_MAPFILE_$(1) = $(2)
 @end
 
 [$FEATURE.REMOTE_RUNTIME_CONFIG]
