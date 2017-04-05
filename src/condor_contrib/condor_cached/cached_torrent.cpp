@@ -262,7 +262,7 @@ std::string MakeTorrent(const std::string directory, const std::string cacheId)
   
   if(t.priv()) {
     dprintf(D_FULLDEBUG, "Torrent is set as private.  Setting as public.\n");
-    (t.set_priv)(false);
+    t.s_priv(false);
   }
   
   t.set_comment(cacheId.c_str());
